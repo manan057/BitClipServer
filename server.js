@@ -2,6 +2,8 @@ var express = require('express');
 var path = require('path');
 var cors = require('cors');
 var http = require('http');
+var bodyParser = require('body-parser');
+var rp = require('request-promise');
 
 var dbRequest = require('./db/dbRequestHandler.js');
 
@@ -32,6 +34,28 @@ app.get('/api/marketdata', function(req, res) {
     res.status(200).send(data);
   });
 });
+
+app.post('/api/getcoins', bodyParser.json(), function(req, res) {
+	if (req.body.address) {
+		var token = require('./secrets').blockcypherToken;
+		rp({
+			method: "POST",
+			url: "https://api.blockcypher.com/v1/btc/test3/faucet?token=" + token,
+			body: {
+				address: req.body.address,
+				amount: 490000
+			},
+			json: true
+		}).then(function(response) {
+			res.send(response)
+		}).catch(function(err) {
+			res.send({err: err})
+		});
+	} else {
+		res.send({error: "No address provided"});
+	}
+
+})
 
 var port = process.env.PORT || 3010;
 
