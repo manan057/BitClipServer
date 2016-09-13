@@ -1,0 +1,7 @@
+{
+  "apps" : [{
+    "name"        : "marketdata",
+    "script"      : "server.js",
+    "args"        : ["--max-restart-memory 100M"]
+    }]
+}

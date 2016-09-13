@@ -33,7 +33,7 @@ app.get('/api/marketdata', function(req, res) {
   });
 });
 
-var port = process.env.PORT || 8080;
+var port = process.env.PORT || 3010;
 
 app.listen(port, function() {
 	console.log("Listening on: ", port);
