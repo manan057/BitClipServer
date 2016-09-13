@@ -49,7 +49,11 @@ app.post('/api/getcoins', bodyParser.json(), function(req, res) {
 		}).then(function(response) {
 			res.send(response)
 		}).catch(function(err) {
-			res.send({err: err})
+			if (err.error) {
+				res.send(err.error);
+			} else {
+				res.send({error: "Get testnet coins failed"});
+			}
 		});
 	} else {
 		res.send({error: "No address provided"});
