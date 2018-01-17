@@ -5,7 +5,6 @@ var Pusher = require('pusher-client');
 var db = require('./dbSchema.js');
 var BitstampData = require('./models/bitstampModel.js');
 var BitfinexData = require('./models/bitfinexModel.js');
-var BtcEData = require('./models/btcEModel.js');
 
 // List of all API sockets we want to connect to
 var apiSockets = {
@@ -15,15 +14,13 @@ var apiSockets = {
 // List of all API URLs we will send GET requests to
 // Format: [URL, requests/hour]
 var apiGetRequests = {
-  bitfinex: ['https://api.bitfinex.com/v1/trades/btcusd?timestamp=', 60],
-  btcE: ['https://btc-e.com/api/3/trades/btc_usd', 60]
+  bitfinex: ['https://api.bitfinex.com/v1/trades/btcusd?timestamp=', 60]
 };
 
 // Format: [APIModelName, APITableName]
 var apiDbSetup = {
   bitstamp: [BitstampData, 'bitstampMarketData'],
-  bitfinex: [BitfinexData, 'bitfinexMarketData'],
-  btcE: [BtcEData, 'btcEMarketData']
+  bitfinex: [BitfinexData, 'bitfinexMarketData']
 };
 
 // The obj is the JSON object we receive from the API.
@@ -43,14 +40,6 @@ var apiModelInfo = {
       price: obj.price,
       createdAt: obj.timestamp * 1000
     };
-  },
-  btcE: function(obj) {
-    return {
-      btcETradeKey: obj.tid,
-      amount: obj.amount,
-      price: obj.price,
-      createdAt: obj.timestamp * 1000
-    };
   }
 };
 
@@ -66,14 +55,6 @@ var apiTableInfo = {
     };
   },
   bitfinex: function(row) {
-    return {
-      sourceKey: row.sourceKey,
-      amount: row.amount,
-      price: row.price,
-      createdAt: row.createdAt
-    };
-  },
-  btcE: function(row) {
     return {
       sourceKey: row.sourceKey,
       amount: row.amount,
@@ -120,23 +101,6 @@ dbRequests.initializeGetRequests = function() {
               data = JSON.parse(data);
               for (var i = 0, l = data.length; i < l; i++) {
                 dbRequests.createModels('bitfinex', data[i]);
-              }
-            });
-          });
-        };
-      } else if (api === 'btcE') {
-        dbRequests.getRequestEvents[api] = function() {
-          var timeThreshold = Math.ceil(Date.now() / 1000) - 59;
-          var url = apiGetRequests.btcE[0];
-          https.get(url, function(res) {
-            var data = '';
-            res.on('data', function(chunk) {
-              data += chunk;
-            });
-            res.on('end', function() {
-              data = JSON.parse(data);
-              for (var i = 0, l = data.btc_usd.length; i < l; i++) {
-                if (data.btc_usd[i].timestamp > timeThreshold) dbRequests.createModels('btcE', data.btc_usd[i]);
               }
             });
           });
@@ -199,7 +163,7 @@ dbRequests.deliverMarketData = function(req) {
   var deferred = q.defer();
   var time = parseInt(req.query.time);
   var timePeriod = parseInt(req.query.timePeriod);
-  
+
   db.knex.raw('SELECT source, MAX(createdAt) AS createdAt, (SUM(amount * price) / SUM(amount)) AS volumeWeightedAvgPrice FROM aggregatedMarketData a INNER JOIN sources b ON a.sourceKey = b.sourceKey WHERE createdAt BETWEEN "' + (time - timePeriod) + '" AND "' + time + '" GROUP BY a.sourceKey, ROUND(createdAt / 900000)')
     .then(function(rows) {
       var exchanges = {};
@@ -222,7 +186,7 @@ dbRequests.deliverMarketData = function(req) {
           var avgPrice = rows[0].avgPrice;
           db.knex.raw('SELECT MAX(price) AS maxPrice, MIN(price) AS minPrice, SUM(amount) AS volume, (SUM(price * amount) / SUM(amount)) AS volumeWeightedAvgPrice, SUM((price - ' + avgPrice + ') * (price - ' + avgPrice + ')) AS stdDeviationNumerator, COUNT(price) AS stdDeviationDenominator FROM aggregatedMarketData WHERE createdAt BETWEEN "' + (time - timePeriod) + '" AND "' + time + '"')
           .then(function(rows) {
-            var result = { 
+            var result = {
               timePeriod: timePeriod,
               time: new Date().getTime(),
               transactions: transactions,
