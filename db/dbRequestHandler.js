@@ -5,6 +5,8 @@ var Pusher = require('pusher-client');
 var db = require('./dbSchema.js');
 var BitstampData = require('./models/bitstampModel.js');
 var BitfinexData = require('./models/bitfinexModel.js');
+var IndependentReserveData = require('./models/independentReserveModel.js');
+var generate = require('nanoid/generate');
 
 // List of all API sockets we want to connect to
 var apiSockets = {
@@ -14,13 +16,15 @@ var apiSockets = {
 // List of all API URLs we will send GET requests to
 // Format: [URL, requests/hour]
 var apiGetRequests = {
-  bitfinex: ['https://api.bitfinex.com/v1/trades/btcusd?timestamp=', 60]
+  bitfinex: ['https://api.bitfinex.com/v1/trades/btcusd?timestamp=', 60],
+  independentReserve: ['https://api.independentreserve.com/Public/GetRecentTrades?primaryCurrencyCode=xbt&secondaryCurrencyCode=usd&numberOfRecentTradesToRetrieve=50', 60]
 };
 
 // Format: [APIModelName, APITableName]
 var apiDbSetup = {
   bitstamp: [BitstampData, 'bitstampMarketData'],
-  bitfinex: [BitfinexData, 'bitfinexMarketData']
+  bitfinex: [BitfinexData, 'bitfinexMarketData'],
+  independentReserve: [IndependentReserveData, 'independentReserveMarketData']
 };
 
 // The obj is the JSON object we receive from the API.
@@ -40,6 +44,14 @@ var apiModelInfo = {
       price: obj.price,
       createdAt: obj.timestamp * 1000
     };
+  },
+  independentReserve: function(obj) {
+    return {
+      independentReserveTradeKey: generate('0123456789', 8),
+      amount: obj.PrimaryCurrencyAmount,
+      price: obj.SecondaryCurrencyTradePrice,
+      createdAt: new Date(obj.TradeTimestampUtc).getTime()
+    };
   }
 };
 
@@ -55,6 +67,14 @@ var apiTableInfo = {
     };
   },
   bitfinex: function(row) {
+    return {
+      sourceKey: row.sourceKey,
+      amount: row.amount,
+      price: row.price,
+      createdAt: row.createdAt
+    };
+  },
+  independentReserve: function(row) {
     return {
       sourceKey: row.sourceKey,
       amount: row.amount,
@@ -101,6 +121,23 @@ dbRequests.initializeGetRequests = function() {
               data = JSON.parse(data);
               for (var i = 0, l = data.length; i < l; i++) {
                 dbRequests.createModels('bitfinex', data[i]);
+              }
+            });
+          });
+        };
+      } else if (api === 'independentReserve') {
+        dbRequests.getRequestEvents[api] = function() {
+          var timeThreshold = Math.ceil(Date.now() / 1000) - 49;
+          var url = apiGetRequests.independentReserve[0];
+          https.get(url, function(res) {
+            var data = '';
+            res.on('data', function(chunk) {
+              data += chunk;
+            });
+            res.on('end', function() {
+              data = JSON.parse(data);
+              for (var i = 0, l = data.Trades.length; i < l; i++) {
+                dbRequests.createModels('independentReserve', data.Trades[i]);
               }
             });
           });

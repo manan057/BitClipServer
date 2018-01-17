@@ -52,6 +52,19 @@ db.knex.schema.hasTable('bitfinexMarketData').then(function(exists) {
   }
 });
 
+db.knex.schema.hasTable('independentReserveMarketData').then(function(exists) {
+  if (!exists) {
+    db.knex.schema.createTable('independentReserveMarketData', function(marketData) {
+      marketData.increments('independentReserveTradeKey').primary();
+      marketData.float('amount');
+      marketData.decimal('price', 18, 2);
+      marketData.integer('createdAt');
+    }).then(function(table) {
+      console.log('Created independentReserveMarketData', table);
+    });
+  }
+});
+
 /************************************************************/
 // Utility and joining tables
 /************************************************************/
